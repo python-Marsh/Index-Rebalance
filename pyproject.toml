@@ -13,6 +13,9 @@ pandas = ">=2.3.0,<3.0.0"
 polygon-api-client = "^1.14.6"
 yfinance = "^0.2.63"
 lxml = "^5.4.0"
+selenium = "^4.33.0"
+html5lib = "^1.1"
+streamlit = "^1.46.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
