@@ -1,12 +1,14 @@
 import re
+from datetime import datetime
+from typing import Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from typing import Tuple, List, Dict
-from datetime import datetime
+
 
 def fetch_ftse_tickers():
-    """Fetch the top 350 tickers from wikipedia and summarise into a DataFrame
+    """Fetch the top 350 tickers from wikipedia and summarise into a DataFrame.
 
     Returns:
         pd.DataFrame: DataFrame including the top 350 tickers with the following columns:
@@ -19,22 +21,22 @@ def fetch_ftse_tickers():
     # Get FTSE 100
     tables = pd.read_html("https://en.wikipedia.org/wiki/FTSE_100_Index")
     ftse_100 = tables[4]
-    ftse_100['constituent'] = True
-    ftse_100.columns = [re.sub(r'\[\d+\]', '', col).lower() for col in ftse_100.columns]
+    ftse_100["constituent"] = True
+    ftse_100.columns = [re.sub(r"\[\d+\]", "", col).lower() for col in ftse_100.columns]
     # Get FTSE 250
     tables = pd.read_html("https://en.wikipedia.org/wiki/FTSE_250_Index")
     ftse_250 = tables[3]
-    ftse_250['constituent'] = False # FTSE 250 tickers are not constituents of FTSE 100
-    ftse_250.columns = [re.sub(r'\[\d+\]', '', col).lower() for col in ftse_250.columns]
+    ftse_250["constituent"] = False  # FTSE 250 tickers are not constituents of FTSE 100
+    ftse_250.columns = [re.sub(r"\[\d+\]", "", col).lower() for col in ftse_250.columns]
     # Concatenate FSTE 100 and FSTE 250
     ftse_df = pd.concat([ftse_100, ftse_250], ignore_index=True)
-    ftse_df['current rank'] = range(1, len(ftse_df) + 1)
-    ftse_df.set_index('current rank')
+    ftse_df["current rank"] = range(1, len(ftse_df) + 1)
+    ftse_df.set_index("current rank")
     return ftse_df
 
 
 def fetch_yf_data(ftse_df: pd.DataFrame):
-    """Fetch market data from yahoo finance
+    """Fetch market data from yahoo finance.
 
     Args:
         ftse_df (pd.DataFrame): DataFrame including the top 350 tickers with the following columns:
@@ -52,9 +54,9 @@ def fetch_yf_data(ftse_df: pd.DataFrame):
             - float shares
             - constituent: True if the ticker is a constituent of FTSE 100, otherwise False
     """
-    ftse_tickers = ftse_df['ticker'].tolist()
-    company_names = ftse_df['company'].tolist()
-    constituent = ftse_df['constituent'].tolist()
+    ftse_tickers = ftse_df["ticker"].tolist()
+    company_names = ftse_df["company"].tolist()
+    constituent = ftse_df["constituent"].tolist()
 
     # Append '.L' for Yahoo Finance (London Exchange)
     ftse_tickers = [t + ".L" for t in ftse_tickers]
@@ -83,16 +85,20 @@ def fetch_yf_data(ftse_df: pd.DataFrame):
     market_data_df.index = range(1, len(market_data_df) + 1)
     return market_data_df
 
-def get_drift_and_volatility(tickers: List[str], lookback_days: int = 252) -> Dict[str, Tuple[float, float]]:
-    """
-    Computes the annualized drift and volatility for multiple stocks using historical data.
+
+def get_drift_and_volatility(
+    tickers: List[str], lookback_days: int = 252
+) -> Dict[str, Tuple[float, float]]:
+    """Computes the annualized drift and volatility for multiple stocks using historical
+    data.
 
     Args:
         tickers (List[str]): List of ticker symbols (e.g., ['AAPL', 'MSFT']).
         lookback_days (int): Number of trading days to look back (default 252 ~ 1 year).
 
     Returns:
-        Dict[str, Tuple[float, float]]: Dictionary mapping ticker to (annualized_drift, annualized_volatility)
+        Dict[str, Tuple[float, float]]: Dictionary mapping ticker to (annualized_drift,
+        annualized_volatility)
     """
     results = {}
     current_date = pd.to_datetime(datetime.today())
@@ -101,10 +107,10 @@ def get_drift_and_volatility(tickers: List[str], lookback_days: int = 252) -> Di
     # Download all tickers at once
     data = yf.download(
         tickers,
-        start=start_date.strftime('%Y-%m-%d'),
-        end=current_date.strftime('%Y-%m-%d'),
-        group_by='ticker',
-        auto_adjust=False
+        start=start_date.strftime("%Y-%m-%d"),
+        end=current_date.strftime("%Y-%m-%d"),
+        group_by="ticker",
+        auto_adjust=False,
     )
 
     # If only one ticker, data won't have multi-level columns, fix this:
@@ -119,8 +125,8 @@ def get_drift_and_volatility(tickers: List[str], lookback_days: int = 252) -> Di
             ticker_data = data[ticker]
 
             # Prefer 'Adj Close', fallback to 'Close'
-            if 'Close' in ticker_data.columns:
-                price_col = 'Close'
+            if "Close" in ticker_data.columns:
+                price_col = "Close"
             else:
                 raise ValueError(f"No usable price column found for {ticker}.")
 
@@ -128,11 +134,16 @@ def get_drift_and_volatility(tickers: List[str], lookback_days: int = 252) -> Di
             available_days = len(ticker_data)
 
             if available_days < 2:
-                raise ValueError(f"Not enough data to compute drift and volatility for {ticker} (only {available_days} day(s) available).")
+                raise ValueError(
+                    f"Not enough data to compute drift and volatility for {ticker}"
+                    "(only {available_days} day(s) available)."
+                )
 
             # Compute daily log returns
-            ticker_data['LogReturn'] = np.log(ticker_data[price_col] / ticker_data[price_col].shift(1))
-            log_returns = ticker_data['LogReturn'].dropna()
+            ticker_data["LogReturn"] = np.log(
+                ticker_data[price_col] / ticker_data[price_col].shift(1)
+            )
+            log_returns = ticker_data["LogReturn"].dropna()
 
             daily_drift = log_returns.mean()
             daily_volatility = log_returns.std()
@@ -148,9 +159,11 @@ def get_drift_and_volatility(tickers: List[str], lookback_days: int = 252) -> Di
 
     return results
 
-def add_drift_and_volatility(df: pd.DataFrame, lookback_days: int = 252) -> pd.DataFrame:
-    """
-    Takes a DataFrame of tickers and adds annualized drift and volatility columns.
+
+def add_drift_and_volatility(
+    df: pd.DataFrame, lookback_days: int = 252
+) -> pd.DataFrame:
+    """Takes a DataFrame of tickers and adds annualized drift and volatility columns.
 
     Args:
         df (pd.DataFrame): DataFrame with the following columns:
@@ -166,16 +179,22 @@ def add_drift_and_volatility(df: pd.DataFrame, lookback_days: int = 252) -> pd.D
         pd.DataFrame: The original DataFrame with two new columns 'drift' and 'volatility'.
     """
 
-    tickers = df['ticker'].tolist()
+    tickers = df["ticker"].tolist()
 
-    # Reuse the get_drift_and_volatility function you have or the version that downloads all tickers at once:
+    # Reuse the get_drift_and_volatility function you have or the version that downloads all
+    # tickers at once:
     drift_vol_dict = get_drift_and_volatility(tickers, lookback_days=lookback_days)
 
     # Map results back to DataFrame, assign NaN for tickers with missing data
-    df['drift'] = df['ticker'].map(lambda x: drift_vol_dict.get(x, (float('nan'), float('nan')))[0])
-    df['volatility'] = df['ticker'].map(lambda x: drift_vol_dict.get(x, (float('nan'), float('nan')))[1])
+    df["drift"] = df["ticker"].map(
+        lambda x: drift_vol_dict.get(x, (float("nan"), float("nan")))[0]
+    )
+    df["volatility"] = df["ticker"].map(
+        lambda x: drift_vol_dict.get(x, (float("nan"), float("nan")))[1]
+    )
 
     return df
+
 
 def fetch_market_data():
     """_summary_

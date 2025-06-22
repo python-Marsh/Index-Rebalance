@@ -17,6 +17,23 @@ selenium = "^4.33.0"
 html5lib = "^1.1"
 streamlit = "^1.46.0"
 
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.2.0"
+black = "^25.1.0"
+docformatter = "^1.7.7"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
