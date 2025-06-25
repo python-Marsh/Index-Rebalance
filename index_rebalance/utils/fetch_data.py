@@ -114,8 +114,8 @@ def get_drift_and_volatility(
     )
 
     # If only one ticker, data won't have multi-level columns, fix this:
-    if isinstance(tickers, str) or len(tickers) == 1:
-        tickers = [tickers]
+    # if isinstance(tickers, str) or len(tickers) == 1:
+    #     tickers = [tickers]
 
     for ticker in tickers:
         try:
@@ -125,8 +125,8 @@ def get_drift_and_volatility(
             ticker_data = data[ticker]
 
             # Prefer 'Adj Close', fallback to 'Close'
-            if "Close" in ticker_data.columns:
-                price_col = "Close"
+            if "Adj Close" in ticker_data.columns:
+                price_col = "Adj Close"
             else:
                 raise ValueError(f"No usable price column found for {ticker}.")
 
@@ -144,7 +144,7 @@ def get_drift_and_volatility(
                 ticker_data[price_col] / ticker_data[price_col].shift(1)
             )
             log_returns = ticker_data["LogReturn"].dropna()
-
+            log_returns = log_returns.loc[(log_returns < 1) & (log_returns > -1)]
             daily_drift = log_returns.mean()
             daily_volatility = log_returns.std()
 
